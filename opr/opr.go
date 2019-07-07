@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"strings"
+
 	"github.com/FactomProject/btcutil/base58"
 	"github.com/FactomProject/factom"
 	"github.com/dustin/go-humanize"
@@ -16,7 +18,6 @@ import (
 	"github.com/pegnet/pegnet/polling"
 	log "github.com/sirupsen/logrus"
 	"github.com/zpatrick/go-config"
-	"strings"
 )
 
 type OraclePriceRecord struct {
@@ -158,7 +159,7 @@ func (opr *OraclePriceRecord) GetHash() []byte {
 
 // ComputeDifficulty()
 // Difficulty the high order 8 bytes of the hash( hash(OPR record) + nonce)
-func (opr *OraclePriceRecord) ComputeDifficulty(nonce []byte) (difficulty uint64) {
+func (opr *OraclePriceRecord) ComputeDifficulty(nonce []byte) uint64 {
 	no := append(opr.OPRHash, nonce...)
 	h := LX.Hash(no)
 
@@ -166,10 +167,8 @@ func (opr *OraclePriceRecord) ComputeDifficulty(nonce []byte) (difficulty uint64
 	// Because we don't have a difficulty bar, we can define difficulty as the greatest
 	// value, rather than the minimum value.  Our bar is the greatest difficulty found
 	// within a 10 minute period.  We compute difficulty as Big Endian.
-	for i := uint64(0); i < 8; i++ {
-		difficulty = difficulty<<8 + uint64(h[i])
-	}
-	return difficulty
+	return uint64(h[7]) | uint64(h[6])<<8 | uint64(h[5])<<16 | uint64(h[4])<<24 |
+		uint64(h[3])<<32 | uint64(h[2])<<40 | uint64(h[1])<<48 | uint64(h[0])<<56
 }
 
 // Mine()
@@ -177,7 +176,7 @@ func (opr *OraclePriceRecord) ComputeDifficulty(nonce []byte) (difficulty uint64
 func (opr *OraclePriceRecord) Mine(verbose bool) {
 
 	// Pick a new nonce as a starting point.  Take time + last best nonce and hash that.
-	nonce := []byte{0, 0}
+	nonce := make([]byte, 4) // int
 	log.WithFields(log.Fields{"opr_hash": hex.EncodeToString(opr.OPRHash)}).Debug("Started mining")
 
 miningloop:
@@ -188,10 +187,12 @@ miningloop:
 
 		default:
 		}
-		nonce = nonce[:0]
-		for j := i; j > 0; j = j >> 8 {
-			nonce = append(nonce, byte(j))
-		}
+
+		nonce[0] = byte(i >> 24)
+		nonce[1] = byte(i >> 16)
+		nonce[2] = byte(i >> 8)
+		nonce[3] = byte(i)
+
 		diff := opr.ComputeDifficulty(nonce)
 
 		if diff > opr.Difficulty {

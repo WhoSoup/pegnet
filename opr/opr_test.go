@@ -3,6 +3,8 @@
 package opr_test
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -63,5 +65,73 @@ func TestOPR_JSON_Marshal(t *testing.T) {
 	fmt.Println("\n\n", string(v2))
 	if string(v2) != string(v) {
 		t.Error("JSON is different")
+	}
+}
+
+func BenchmarkRefactoredFromSlice(b *testing.B) {
+	var suma, sumb uint64
+	b.Run("slice to uint64 (new)", func(b *testing.B) {
+		var h [64]byte
+		b.StopTimer()
+		rand.Read(h[:])
+		b.StartTimer()
+		for xx := 0; xx < b.N; xx++ {
+			sumb = uint64(h[7]) | uint64(h[6])<<8 | uint64(h[5])<<16 | uint64(h[4])<<24 |
+				uint64(h[3])<<32 | uint64(h[2])<<40 | uint64(h[1])<<48 | uint64(h[0])<<56
+		}
+	})
+
+	b.Run("slice to uint64 (old)", func(b *testing.B) {
+		var h [64]byte
+		b.StopTimer()
+		rand.Read(h[:])
+		b.StartTimer()
+		for xx := 0; xx < b.N; xx++ {
+			suma = 0
+			for i := uint64(0); i < 8; i++ {
+				suma = suma<<8 + uint64(h[i])
+			}
+		}
+	})
+
+	_ = sumb
+}
+
+func BenchmarkRefactoredToSlice(b *testing.B) {
+	b.Run("int to slice (new)", func(b *testing.B) {
+		nonce := make([]byte, 4)
+		for xx := 0; xx < b.N; xx++ {
+			nonce[0] = byte(xx >> 24)
+			nonce[1] = byte(xx >> 16)
+			nonce[2] = byte(xx >> 8)
+			nonce[3] = byte(xx)
+		}
+	})
+	b.Run("int to slice (old)", func(b *testing.B) {
+		nonce := []byte{0, 0}
+		for xx := 0; xx < b.N; xx++ {
+			nonce = nonce[:0]
+			for j := b.N; j > 0; j = j >> 8 {
+				nonce = append(nonce, byte(j))
+			}
+		}
+	})
+}
+
+func TestOraclePriceRecord_ComputeDifficulty_Change(t *testing.T) {
+	var h []byte
+	h = make([]byte, 8)
+	var suma, sumb uint64
+	for i := 0; i < 50; i++ {
+		rand.Read(h)
+		suma = 0
+		for i := uint64(0); i < 8; i++ {
+			suma = suma<<8 + uint64(h[i])
+		}
+		sumb = uint64(h[7]) | uint64(h[6])<<8 | uint64(h[5])<<16 | uint64(h[4])<<24 |
+			uint64(h[3])<<32 | uint64(h[2])<<40 | uint64(h[1])<<48 | uint64(h[0])<<56
+		if suma != sumb {
+			t.Errorf("two results not the same. input = %s, old = %x, new = %x", hex.EncodeToString(h), suma, sumb)
+		}
 	}
 }
