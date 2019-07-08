@@ -167,8 +167,16 @@ func (opr *OraclePriceRecord) ComputeDifficulty(nonce []byte) uint64 {
 	// Because we don't have a difficulty bar, we can define difficulty as the greatest
 	// value, rather than the minimum value.  Our bar is the greatest difficulty found
 	// within a 10 minute period.  We compute difficulty as Big Endian.
-	return uint64(h[7]) | uint64(h[6])<<8 | uint64(h[5])<<16 | uint64(h[4])<<24 |
-		uint64(h[3])<<32 | uint64(h[2])<<40 | uint64(h[1])<<48 | uint64(h[0])<<56
+	if len(nonce) == 8 { // uint64
+		return uint64(h[7]) | uint64(h[6])<<8 | uint64(h[5])<<16 | uint64(h[4])<<24 |
+			uint64(h[3])<<32 | uint64(h[2])<<40 | uint64(h[1])<<48 | uint64(h[0])<<56
+	}
+	// fallback for random data
+	var difficulty uint64
+	for i := uint64(0); i < 8; i++ {
+		difficulty = difficulty<<8 + uint64(h[i])
+	}
+	return difficulty
 }
 
 // Mine()
@@ -176,11 +184,13 @@ func (opr *OraclePriceRecord) ComputeDifficulty(nonce []byte) uint64 {
 func (opr *OraclePriceRecord) Mine(verbose bool) {
 
 	// Pick a new nonce as a starting point.  Take time + last best nonce and hash that.
-	nonce := make([]byte, 4) // int
+	nonce := make([]byte, 8) // uint64
+	opr.Entry.ExtIDs[0] = make([]byte, 8)
+
 	log.WithFields(log.Fields{"opr_hash": hex.EncodeToString(opr.OPRHash)}).Debug("Started mining")
 
 miningloop:
-	for i := 0; ; i++ {
+	for i := uint64(0); ; i++ {
 		select {
 		case <-opr.StopMining:
 			break miningloop
@@ -188,17 +198,21 @@ miningloop:
 		default:
 		}
 
-		nonce[0] = byte(i >> 24)
-		nonce[1] = byte(i >> 16)
-		nonce[2] = byte(i >> 8)
-		nonce[3] = byte(i)
+		nonce[0] = byte(i >> 56)
+		nonce[1] = byte(i >> 48)
+		nonce[2] = byte(i >> 40)
+		nonce[3] = byte(i >> 32)
+		nonce[4] = byte(i >> 24)
+		nonce[5] = byte(i >> 16)
+		nonce[6] = byte(i >> 8)
+		nonce[7] = byte(i)
 
 		diff := opr.ComputeDifficulty(nonce)
 
 		if diff > opr.Difficulty {
 			opr.Difficulty = diff
 			// Copy over the previous nonce
-			opr.Entry.ExtIDs[0] = append(opr.Entry.ExtIDs[0][:0], nonce...)
+			copy(opr.Entry.ExtIDs[0], nonce)
 			log.WithFields(log.Fields{
 				"opr_hash":   hex.EncodeToString(opr.OPRHash),
 				"difficulty": fmt.Sprintf("%016x", diff),
