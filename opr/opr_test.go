@@ -3,6 +3,7 @@
 package opr_test
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -64,4 +65,64 @@ func TestOPR_JSON_Marshal(t *testing.T) {
 	if string(v2) != string(v) {
 		t.Error("JSON is different")
 	}
+}
+
+func dummyCall(b []byte) {
+
+}
+
+func len2(b int) int {
+	if b&0xFF000000 != 0 {
+		return 0
+	}
+	if b&0xFFFF0000 != 0 {
+		return 1
+	}
+	if b&0xFFFFFF00 != 0 {
+		return 2
+	}
+	return 3
+}
+func BenchmarkNonce(b *testing.B) {
+
+	b.Run("old nonce", func(c *testing.B) {
+		nonce := []byte{0, 0}
+		for i := 0; i < c.N; i++ {
+			nonce = nonce[:0]
+			for j := i; j > 0; j = j >> 8 {
+				nonce = append(nonce, byte(j))
+			}
+		}
+		dummyCall(nonce)
+	})
+	b.Run("new nonce A", func(c *testing.B) {
+		nonce := []byte{0}
+		pos := 0
+		for i := 0; i < c.N; i++ {
+			nonce[pos]++
+			for j := pos; j >= 0; j-- {
+				if nonce[pos] == 0 {
+					if pos > 0 {
+						nonce[pos-1]++
+					} else {
+						nonce = append([]byte{1}, nonce...)
+						pos++
+					}
+				} else {
+					break
+				}
+			}
+			dummyCall(nonce)
+		}
+	})
+
+	b.Run("new nonce B", func(c *testing.B) {
+		nonce := make([]byte, 4)
+		for i := 0; i < c.N; i++ {
+			binary.BigEndian.PutUint32(nonce, uint32(i))
+			first := len2(i)
+			dummyCall(nonce[first:])
+		}
+
+	})
 }
