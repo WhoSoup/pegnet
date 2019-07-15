@@ -4,6 +4,7 @@ package opr_test
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -75,10 +76,10 @@ func len2(b int) int {
 	if b&0xFF000000 != 0 {
 		return 0
 	}
-	if b&0xFFFF0000 != 0 {
+	if b&0xFF0000 != 0 {
 		return 1
 	}
-	if b&0xFFFFFF00 != 0 {
+	if b&0xFF00 != 0 {
 		return 2
 	}
 	return 3
@@ -118,11 +119,51 @@ func BenchmarkNonce(b *testing.B) {
 
 	b.Run("new nonce B", func(c *testing.B) {
 		nonce := make([]byte, 4)
+		first := 0
 		for i := 0; i < c.N; i++ {
 			binary.BigEndian.PutUint32(nonce, uint32(i))
-			first := len2(i)
+			if nonce[0] != 0 {
+				first = 0
+			} else if nonce[1] != 0 {
+				first = 1
+			} else if nonce[2] != 0 {
+				first = 2
+			} else if nonce[3] != 0 {
+				first = 3
+			} else {
+				first = 4
+			}
 			dummyCall(nonce[first:])
 		}
 
 	})
+}
+
+func TestNonce(t *testing.T) {
+	nonce1 := []byte{0, 0}
+	nonce2 := make([]byte, 4)
+	first := 0
+	for i := 0; i < 0xFFFFFF; i++ {
+		nonce1 = nonce1[:0]
+		for j := i; j > 0; j = j >> 8 {
+			nonce1 = append(nonce1, byte(j))
+		}
+
+		binary.BigEndian.PutUint32(nonce2, uint32(i))
+		if nonce2[0] != 0 {
+			first = 0
+		} else if nonce2[1] != 0 {
+			first = 1
+		} else if nonce2[2] != 0 {
+			first = 2
+		} else if nonce2[3] != 0 {
+			first = 3
+		} else {
+			first = 4
+		}
+
+		if len(nonce1) != len(nonce2[first:]) {
+			t.Errorf("Nonce failed at %d with results %s and %s", i, hex.EncodeToString(nonce1), hex.EncodeToString(nonce2[first:]))
+		}
+	}
 }
