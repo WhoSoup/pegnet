@@ -193,8 +193,8 @@ func TestAddress_All(t *testing.T) {
 			t.Errorf("unable to parse %s into factom address: %v", addr, err)
 		}
 
-		if orig := fa.Original(); orig != addr {
-			t.Errorf("fa.Original() did not return the same value: want = %s, got = %s", addr, orig)
+		if orig := fa.ToString(); orig != addr {
+			t.Errorf("fa.ToString() did not return the same value: want = %s, got = %s", addr, orig)
 		}
 
 		if bytes.Compare(fa.RCD, validRCD[addr]) != 0 {
@@ -207,8 +207,8 @@ func TestAddress_All(t *testing.T) {
 				t.Errorf("error converting %s to address: %v", paddr, err)
 			}
 
-			if orig := a.Original(); orig != paddr {
-				t.Errorf("a.Original() for %s returned %s", paddr, orig)
+			if orig := a.ToString(); orig != paddr {
+				t.Errorf("a.ToString() for %s returned %s", paddr, orig)
 			}
 
 			if a.Prefix != asset {
