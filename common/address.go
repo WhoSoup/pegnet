@@ -125,3 +125,13 @@ func (a *Address) FactomAddress() string {
 	data = append(data, a.Checksum("")...)
 	return base58.Encode(data)
 }
+
+// IsSame returns true if both the RCD and the prefix match
+func (a *Address) IsSame(b *Address) bool {
+	return a.Prefix == b.Prefix && bytes.Compare(a.RCD, b.RCD) == 0
+}
+
+// IsSameBase returns true if the base RCD matches
+func (a *Address) IsSameBase(b *Address) bool {
+	return bytes.Compare(a.RCD, b.RCD) == 0
+}

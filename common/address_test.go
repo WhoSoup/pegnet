@@ -215,7 +215,7 @@ func TestAddress_All(t *testing.T) {
 				t.Errorf("parsed the wrong asset for %s: want = %s, got = %s", paddr, asset, a.Prefix)
 			}
 
-			if bytes.Compare(a.RCD, validRCD[addr]) != 0 {
+			if !a.IsSameBase(fa) {
 				t.Errorf("asset %s did not decode the valid RCD: want = %s, got %s", paddr, hex.EncodeToString(validRCD[addr]), hex.EncodeToString(a.RCD))
 			}
 
