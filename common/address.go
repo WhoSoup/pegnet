@@ -102,8 +102,8 @@ func (a *Address) Checksum(asset string) []byte {
 	return hash[:4]
 }
 
-// ToString returns the human readable address for the rcd and set asset
-func (a *Address) ToString() string {
+// String returns the human readable address for the rcd and set asset
+func (a *Address) String() string {
 	return a.ToAsset(a.Prefix)
 }
 
