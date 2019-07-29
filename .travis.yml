@@ -14,14 +14,18 @@ matrix:
   allow_failures:
     - os: windows
 
+before_cache:
+  - mkdir ~/.lxrhash
+  - chmod -R 777 ~/.lxrhash
+
 cache:
   directories:
     - /home/travis/.lxrhash/
 
 script:
   - ./.gofmt.sh
-  - travis_wait 40 go test -parallel 1 ./...
-  - travis_wait 40 go test -parallel 1 -race ./...
+  - go test -parallel 1 ./...
+  - go test -parallel 1 -race ./...
 
 # GO111MODULE will force Go modules
 # This will be unnecessary when Go 1.13 lands.
