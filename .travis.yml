@@ -16,7 +16,7 @@ matrix:
 
 before_cache:
   - mkdir ~/.lxrhash
-  - chmod -R 777 ~/.lxrhash
+  - chmod -R -v 777 ~/.lxrhash
 
 cache:
   directories:
@@ -30,7 +30,7 @@ script:
 # GO111MODULE will force Go modules
 # This will be unnecessary when Go 1.13 lands.
 env:
-  - GO111MODULE=on LXRBITSIZE=30
+  - GO111MODULE=on
 
 # Modifies go get flags
 # Can be removed when factom@v1-rollup is merged into master 
