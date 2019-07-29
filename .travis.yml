@@ -14,15 +14,19 @@ matrix:
   allow_failures:
     - os: windows
 
+ cache:
+    directories:
+     - /home/travis/.lxrhash/
+
 script:
   - ./.gofmt.sh
-  - go test ./...
-  - go test -race ./...
+  - travis_wait 40 go test ./...
+  - travis_wait 40 go test -race ./...
 
 # GO111MODULE will force Go modules
 # This will be unnecessary when Go 1.13 lands.
 env:
-  - GO111MODULE=on LXRBITSIZE=25
+  - GO111MODULE=on LXRBITSIZE=30
 
 # Modifies go get flags
 # Can be removed when factom@v1-rollup is merged into master 
