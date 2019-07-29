@@ -26,11 +26,6 @@ cache:
 
 script:
   - ./.gofmt.sh
-  # Ping stdout every 5 minutes or Travis kills build
-  - |
-    while sleep 5m; do
-      echo "====[ $SECONDS seconds running time ]===="
-    done &
   - go test -parallel 1 -timeout 45m ./...
   - go test -parallel 1 -race -timeout 45m ./...
 
