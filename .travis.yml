@@ -15,15 +15,22 @@ matrix:
     - os: windows
 
 before_cache:
-  - mkdir ~/.lxrhash
-  - chmod -R -v 777 ~/.lxrhash
+  - mkdir $HOME/.lxrhash
+  - chmod -R -v 555 $HOME/.lxrhash
 
 cache:
   directories:
-    - /home/travis/.lxrhash/
+    - $HOME/.lxrhash/
+    - $HOME/.cache/go-build
+    - $HOME/gopath/pkg/mod
 
 script:
   - ./.gofmt.sh
+  # Ping stdout every 5 minutes or Travis kills build
+  - |
+    while sleep 5m; do
+      echo "====[ $SECONDS seconds running time ]===="
+    done &
   - go test -parallel 1 ./...
   - go test -parallel 1 -race ./...
 
