@@ -3,10 +3,37 @@ package common
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+func ParseFixed(s string) (*big.Rat, error) {
+	idx := strings.Index(s, ".")
+	if idx > -1 && len(s)-idx > 9 {
+		return nil, fmt.Errorf("more than eight decimals")
+	}
+
+	f := &big.Rat{}
+	err := f.UnmarshalText([]byte(s))
+	if err != nil {
+		return nil, err
+	}
+
+	if f.Sign() < 0 {
+		return nil, fmt.Errorf("number is negative")
+	}
+
+	return f, nil
+}
+
+func TrimFixed(f *big.Rat) string {
+	s := f.FloatString(8)
+	s = strings.TrimRight(s, "0")
+	s = strings.TrimRight(s, ".")
+	return s
+}
 
 // Amount can be used to convert from fixed point to integer.
 // Amount assumes the smallest divisible unit is 1e-8

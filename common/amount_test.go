@@ -92,3 +92,60 @@ func TestFromFloat(t *testing.T) {
 		}
 	}
 }
+
+func TestParseFixed(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{"empty", args{""}, "", true},
+		{"zero", args{"0"}, "0.00000000", false},
+		{"one", args{"1"}, "1.00000000", false},
+		{"negative", args{"-1"}, "", true},
+		{"one decimal", args{".1"}, "0.10000000", false},
+		{"all decimal", args{"0.12345678"}, "0.12345678", false},
+		{"decimal no pre0", args{".12345678"}, "0.12345678", false},
+		{"too many decimal", args{"0.123456789"}, "", true},
+		{"large non frac", args{"12303580123891845729385719382479835723984723948723948723498723498273450928345234"}, "12303580123891845729385719382479835723984723948723948723498723498273450928345234.00000555", false},
+		{"large frac", args{"12303580123891845729385719382479835723984723948723948723498723498273450928345234"}, "12303580123891845729385719382479835723984723948723948723498723498273450928345234.00000555", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseFixed(tt.args.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseFixed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil && got.FloatString(8) != tt.want {
+				t.Errorf("ParseFixed() = %v, want %v", got.FloatString(8), tt.want)
+			}
+		})
+	}
+}
+
+func TestTrimFixed(t *testing.T) {
+	tests := []struct {
+		name string
+		args string
+		want string
+	}{
+		{"zero", "0", "0"},
+		{"hundred", "100", "100"},
+		{"decimal", "0.1", "0.1"},
+		{"trim all decimal", "1.000", "1"},
+		{"trim some decimal", "1.020", "1.02"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, _ := ParseFixed(tt.args)
+			if got := TrimFixed(r); got != tt.want {
+				t.Errorf("TrimFixed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
