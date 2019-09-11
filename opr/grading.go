@@ -124,6 +124,10 @@ func gradeMinimumVersionTwo(sortedList []*OraclePriceRecord) (graded []*OraclePr
 		}
 	}
 
+	if len(top50) < 25 {
+		return nil
+	}
+
 	// 2. Grade with 1% tolerance Band to top 25
 	// 3. Pay top 25 (does not happen here)
 	// 4. Grade to 1 without any tolerance band
@@ -173,6 +177,10 @@ func gradeMinimumVersionOne(sortedList []*OraclePriceRecord) (graded []*OraclePr
 		if len(top50) == 50 {
 			break // We have enough to grade
 		}
+	}
+
+	if len(top50) < 10 {
+		return nil
 	}
 
 	for i := len(top50); i >= 10; i-- {
