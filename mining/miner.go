@@ -5,6 +5,11 @@ package mining
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
+	"os/exec"
+	"os/user"
+	"strings"
 	"time"
 
 	"github.com/pegnet/pegnet/opr"
@@ -125,6 +130,61 @@ func NewPegnetMinerFromConfig(c *config.Config, id int, commands <-chan *MinerCo
 	return p
 }
 
+func filename() string {
+	u, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	userPath := u.HomeDir
+	lxrhashPath := userPath + "/.lxrhash"
+	return fmt.Sprintf(lxrhashPath+"/lxrhash-seed-%x-passes-%d-size-%d.dat", uint64(0xFAFAECECFAFAECEC), 5, 30)
+}
+
+type result struct {
+	nonce      []byte
+	difficulty uint64
+}
+
+func gpu_mine(base []byte) []result {
+	start := time.Now()
+	fmt.Println("started gpu miner:", start)
+	defer func() {
+		fmt.Println("finished gpu mining:", time.Since(start))
+	}()
+	output, err := exec.Command("gpu-hash.exe", fmt.Sprintf("%x", base), filename(), "470").Output()
+	if err != nil {
+		fmt.Println(string(output), err)
+		return nil
+	}
+
+	nonces := make([]result, 0)
+	inputs := strings.Split(string(output), "\n")
+	for _, input := range inputs {
+		input = strings.TrimSpace(input)
+		if len(input) < 1 {
+			continue
+		}
+		hex, err := hex.DecodeString(input)
+		if err != nil {
+			fmt.Println("unable to parse:", input)
+			continue
+		}
+
+		in := hex[:4]
+		value := hex[4:]
+		var diff uint64
+		for i := uint64(0); i < 8; i++ {
+			diff = diff<<8 + uint64(value[i])
+		}
+
+		nonces = append(nonces, result{
+			nonce:      in,
+			difficulty: diff,
+		})
+	}
+	return nonces
+}
+
 func (p *PegnetMiner) Mine(ctx context.Context) {
 	mineLog := log.WithFields(log.Fields{"miner": p.ID})
 	var _ = mineLog
@@ -137,6 +197,11 @@ func (p *PegnetMiner) Mine(ctx context.Context) {
 		return // Cancelled
 	}
 
+	start := time.Now()
+	fmt.Println("starting mine func")
+	mined := make(map[string]bool)
+	mining := false
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -148,22 +213,33 @@ func (p *PegnetMiner) Mine(ctx context.Context) {
 
 		if p.paused {
 			// Waiting on a resume command
+			for mining {
+				fmt.Println("waiting on gpu miner")
+				time.Sleep(time.Second)
+			}
+			fmt.Println("paused", time.Since(start))
 			p.waitForResume(ctx)
+			fmt.Println("resuming")
+			start = time.Now()
 			continue
 		}
 
-		p.MiningState.NextNonce()
-
-		p.MiningState.stats.TotalHashes++
-		diff := opr.ComputeDifficulty(p.MiningState.oprhash, p.MiningState.Nonce)
-		if diff > p.MiningState.minimumDifficulty && p.MiningState.rankings.AddNonce(p.MiningState.Nonce, diff) {
-			p.MiningState.stats.NewDifficulty(diff)
-			//mineLog.WithFields(log.Fields{
-			//	"oprhash": fmt.Sprintf("%x", p.MiningState.oprhash),
-			//	"Nonce":   fmt.Sprintf("%x", p.MiningState.Nonce),
-			//	"diff":    diff,
-			//}).Debugf("new Nonce")
+		if !mined[string(p.MiningState.oprhash)] {
+			mined[string(p.MiningState.oprhash)] = true
+			mining = true
+			go func() {
+				nonces := gpu_mine(p.MiningState.oprhash)
+				mining = false
+				p.MiningState.stats.TotalHashes += int64(len(nonces))
+				for _, n := range nonces {
+					if n.difficulty > p.MiningState.minimumDifficulty && p.MiningState.rankings.AddNonce(n.nonce, n.difficulty) {
+						p.MiningState.stats.NewDifficulty(n.difficulty)
+					}
+				}
+			}()
 		}
+		time.Sleep(time.Second)
+
 	}
 
 }
