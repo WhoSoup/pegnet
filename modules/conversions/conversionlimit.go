@@ -8,8 +8,42 @@ import (
 )
 
 const (
+
+	// PegNet v1
 	// PEG allocated per block for conversions (not including the bank)
+	// keep old value for correct work
 	PerBlock uint64 = 5000 * 1e8
+
+	// PegNet v2
+	// 1. We reduce default supply to 0 since we have other
+	//    values that builds up total supply
+	PerBlockMiners = 5000 * 1e8
+
+	// PegNet v2
+	// 2 past miners / PIP 14
+	PerBlockPastMiners = 4000 * 1e8
+
+	// PegNet v2
+	// 3 pAsset holders as the arb reward / PIP 12
+	PerBlockAssetHolders = 4500 * 1e8
+
+	// PegNet v2
+	// 4 PEG Stakers adding oracle prices / PIP 13
+	PerBlockStakers = 4500 * 1e8
+
+	// PegNet v2
+	// 5 developers as directed by PEG Stakers / PIP 16.
+	PerBlockDevelopers = 2000 * 1e8
+
+	// PegNet v2
+	// Use this for v2.0 calculations
+	// Total PEG allocated per block for conversions (not including the bank)
+	// NB: in PegNet v1.0 PerBlock 5000 * 1e8
+	PerBlockPegNet2 uint64 = PerBlockMiners +
+		PerBlockPastMiners +
+		PerBlockAssetHolders +
+		PerBlockStakers +
+		PerBlockDevelopers
 )
 
 // ConversionSupplySet indicates the total amount of PEG allowed to be converted
@@ -54,6 +88,13 @@ func (s *ConversionSupplySet) AddConversion(txid string, pegAmt uint64) error {
 	s.ConversionRequests[txid] = pegAmt
 	s.totalRequested.Add(s.totalRequested, new(big.Int).SetUint64(pegAmt))
 	return nil
+}
+
+// TotalRequested is the total amount of PEG requested for this set.
+// The payouts are limited to the amount in the bank, but the requested
+// amount can far exceed it.
+func (s *ConversionSupplySet) TotalRequested() uint64 {
+	return s.totalRequested.Uint64()
 }
 
 // Payouts returns the amount of PEG to allow each Tx to convert into.

@@ -20,6 +20,15 @@ func TestRandomOPR(t *testing.T) {
 	t.Run("V2", func(t *testing.T) {
 		testRandomOPR(t, 2)
 	})
+	t.Run("V3", func(t *testing.T) {
+		testRandomOPR(t, 3)
+	})
+	t.Run("V4", func(t *testing.T) {
+		testRandomOPR(t, 4)
+	})
+	t.Run("V5", func(t *testing.T) {
+		testRandomOPR(t, 5)
+	})
 	t.Run("Bad Version", func(t *testing.T) {
 		a, b, c := RandomOPR(0)
 		if a != nil || b != nil || c != nil {

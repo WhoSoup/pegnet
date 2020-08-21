@@ -11,10 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff"
 	"github.com/pegnet/pegnet/common"
 	log "github.com/sirupsen/logrus"
-	"github.com/zpatrick/go-config"
+	config "github.com/zpatrick/go-config"
 )
 
 // CoinCapDataSource is the datasource at https://coincap.io/
@@ -37,11 +36,13 @@ func (d *CoinCapDataSource) Url() string {
 }
 
 func (d *CoinCapDataSource) SupportedPegs() []string {
-	return common.CryptoAssets
+	s := append(common.CryptoAssets, common.V4CryptoAdditions...)
+	V5CryptoAdditions := []string{"NEO", "ETC", "ONT", "DOGE", "VET", "HT", "ALGO", "DGB"}
+	return append(s, V5CryptoAdditions...)
 }
 
 func (d *CoinCapDataSource) FetchPegPrices() (peg PegAssets, err error) {
-	resp, err := CallCoinCap(d.config)
+	resp, err := d.CallCoinCap(d.config)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +54,13 @@ func (d *CoinCapDataSource) FetchPegPrices() (peg PegAssets, err error) {
 	timestamp := time.Unix(UnixTimestamp, 0)
 
 	for _, currency := range resp.Data {
+		id, ok := CoinCapIOCryptoAssetNames[currency.Symbol]
+		if ok {
+			if currency.ID != id {
+				continue // This is a duplicate ticker with a bad id
+			}
+		}
+
 		switch currency.Symbol {
 		case "BTC", "XBT":
 			value, err := strconv.ParseFloat(currency.PriceUSD, 64)
@@ -74,7 +82,7 @@ func (d *CoinCapDataSource) FetchPegPrices() (peg PegAssets, err error) {
 			}
 		default:
 			// See if the ticker is in our crypto currency list
-			if common.AssetListContains(common.CryptoAssets, currency.Symbol) {
+			if common.AssetListContains(d.SupportedPegs(), currency.Symbol) {
 				value, err := strconv.ParseFloat(currency.PriceUSD, 64)
 				peg[currency.Symbol] = PegItem{Value: value, WhenUnix: UnixTimestamp, When: timestamp}
 				if err != nil {
@@ -131,34 +139,46 @@ var CoinCapIOCryptoAssetNames = map[string]string{
 	"DASH": "dash",
 	"ZEC":  "zcash",
 	"DCR":  "decred",
+	// V4 Adds
+	"EOS":  "eos",
+	"LINK": "chainlink",
+	"ATOM": "cosmos",
+	"BAT":  "basic-attention-token",
+	"XTZ":  "tezos",
+	// V5 Adds
+	"NEO":  "neo",
+	"ETC":  "ethereum-classic",
+	"ONT":  "ontology",
+	"DOGE": "dogecoin",
+	"VET":  "vechain",
+	"HT":   "huobi-token",
+	"ALGO": "algorand",
+	"DGB":  "digibyte",
 }
 
-func CallCoinCap(config *config.Config) (CoinCapResponse, error) {
-	var CoinCapResponse CoinCapResponse
+func (d CoinCapDataSource) CallCoinCap(config *config.Config) (CoinCapResponse, error) {
+	var coinCapResponse CoinCapResponse
+	var emptyResponse CoinCapResponse
 
 	var ids []string
 	// Need to append all the ids we care about for the call
-	for _, a := range common.CryptoAssets {
+	for _, a := range d.SupportedPegs() {
 		ids = append(ids, CoinCapIOCryptoAssetNames[a])
 	}
 
-	operation := func() error {
-		url := "http://api.coincap.io/v2/assets?ids=" + strings.Join(ids, ",")
-		resp, err := http.Get(url)
-		if err != nil {
-			log.WithError(err).Warning("Failed to get response from CoinCap")
-			return err
-		}
-
-		defer resp.Body.Close()
-		if body, err := ioutil.ReadAll(resp.Body); err != nil {
-			return err
-		} else if err = json.Unmarshal(body, &CoinCapResponse); err != nil {
-			return err
-		}
-		return nil
+	url := "http://api.coincap.io/v2/assets?ids=" + strings.Join(ids, ",")
+	resp, err := http.Get(url)
+	if err != nil {
+		log.WithError(err).Warning("Failed to get response from CoinCap")
+		return emptyResponse, err
 	}
 
-	err := backoff.Retry(operation, PollingExponentialBackOff())
-	return CoinCapResponse, err
+	defer resp.Body.Close()
+	if body, err := ioutil.ReadAll(resp.Body); err != nil {
+		return emptyResponse, err
+	} else if err = json.Unmarshal(body, &coinCapResponse); err != nil {
+		return emptyResponse, err
+	}
+
+	return coinCapResponse, err
 }

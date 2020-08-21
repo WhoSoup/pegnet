@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff"
 	"github.com/pegnet/pegnet/common"
 	"github.com/zpatrick/go-config"
 )
@@ -43,12 +42,17 @@ func (d *OneForgeDataSource) Url() string {
 }
 
 func (d *OneForgeDataSource) ApiUrl() string {
-	return "https://forex.1forge.com/1.0.3/"
+	return "https://api.1forge.com/"
 }
 
 func (d *OneForgeDataSource) SupportedPegs() []string {
 	// Does not have all the currencies, commodities, or crypto
-	return common.MergeLists([]string{"EUR", "JPY", "GBP", "CAD", "CHF", "SGD", "HKD", "MXN"}, []string{"XAU", "XAG"})
+	return common.MergeLists(
+		[]string{"EUR", "JPY", "GBP", "CAD", "CHF", "SGD", "HKD", "MXN"}, // Original Currencies
+		[]string{"XAU", "XAG"},
+		[]string{"AUD", "NZD", "SEK", "NOK", "RUB", "ZAR", "TRY"}, // V4 Currencies
+	)
+
 }
 
 // AssetMapping changes some asset symbols to others to match 1forge
@@ -83,7 +87,7 @@ func (d *OneForgeDataSource) FetchPegPrices() (peg PegAssets, err error) {
 			assetSym = v
 		}
 
-		index := fmt.Sprintf("%sUSD", assetSym)
+		index := fmt.Sprintf("%s/USD", assetSym)
 		currency, ok := respRates[index]
 		if !ok {
 			continue
@@ -103,21 +107,17 @@ func (d *OneForgeDataSource) FetchPegPrice(peg string) (i PegItem, err error) {
 func (d *OneForgeDataSource) Call1Forge() ([]OneForgeDataSourceRate, error) {
 	var resp []OneForgeDataSourceRate
 
-	operation := func() error {
-		data, err := d.FetchPeggedPrices()
-		if err != nil {
-			return err
-		}
-
-		resp, err = d.ParseFetchedPrices(data)
-		if err != nil {
-			// Try the other variation
-			return err
-		}
-		return nil
+	data, err := d.FetchPeggedPrices()
+	if err != nil {
+		return nil, err
 	}
 
-	err := backoff.Retry(operation, PollingExponentialBackOff())
+	resp, err = d.ParseFetchedPrices(data)
+	if err != nil {
+		// Try the other variation
+		return nil, err
+	}
+
 	return resp, err
 }
 
@@ -146,7 +146,7 @@ func (d *OneForgeDataSource) FetchPeggedPrices() ([]byte, error) {
 		if v, ok := mapping[asset]; ok {
 			assetSym = v
 		}
-		ids = append(ids, assetSym+"USD")
+		ids = append(ids, assetSym+"/USD")
 	}
 
 	q := url.Values{}
@@ -164,9 +164,9 @@ func (d *OneForgeDataSource) FetchPeggedPrices() ([]byte, error) {
 }
 
 type OneForgeDataSourceRate struct {
-	Symbol    string  `json:"symbol"`
-	Bid       float64 `json:"bid"`
-	Ask       float64 `json:"ask"`
-	Price     float64 `json:"price"`
-	Timestamp int64   `json:"timestamp"`
+	Symbol    string  `json:"s"`
+	Bid       float64 `json:"b"`
+	Ask       float64 `json:"a"`
+	Price     float64 `json:"p"`
+	Timestamp int64   `json:"t"`
 }

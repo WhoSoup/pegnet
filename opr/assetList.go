@@ -57,6 +57,10 @@ func (o OraclePriceRecordAssetList) List(version uint8) []Token {
 	assets := common.AssetsV1
 	if version == 2 || version == 3 {
 		assets = common.AssetsV2
+	} else if version == 4 {
+		assets = common.AssetsV4
+	} else if version == 5 {
+		assets = common.AssetsV5
 	}
 	tokens := make([]Token, len(assets))
 	for i, asset := range assets {
@@ -99,6 +103,10 @@ func (o OraclePriceRecordAssetList) MarshalJSON() ([]byte, error) {
 		assets = common.AssetsV1WithPNT
 	case 2, 3:
 		assets = common.AssetsV2
+	case 4:
+		assets = common.AssetsV4
+	case 5:
+		assets = common.AssetsV5
 	}
 
 	s := "{"
