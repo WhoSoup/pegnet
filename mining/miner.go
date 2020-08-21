@@ -151,7 +151,7 @@ func gpu_mine(base []byte) []result {
 	defer func() {
 		fmt.Println("finished gpu mining:", time.Since(start))
 	}()
-	output, err := exec.Command("gpu-hash.exe", fmt.Sprintf("%x", base), filename(), "470").Output()
+	output, err := exec.Command("gpu-hash.exe", fmt.Sprintf("%x", base), filename(), "400").Output()
 	if err != nil {
 		fmt.Println(string(output), err)
 		return nil
@@ -182,6 +182,7 @@ func gpu_mine(base []byte) []result {
 			difficulty: diff,
 		})
 	}
+	fmt.Println("got", len(nonces), "nonces")
 	return nonces
 }
 
@@ -213,8 +214,9 @@ func (p *PegnetMiner) Mine(ctx context.Context) {
 
 		if p.paused {
 			// Waiting on a resume command
+			startx := time.Now()
 			for mining {
-				fmt.Println("waiting on gpu miner")
+				fmt.Println("waiting on gpu miner", time.Since(startx))
 				time.Sleep(time.Second)
 			}
 			fmt.Println("paused", time.Since(start))
@@ -231,6 +233,7 @@ func (p *PegnetMiner) Mine(ctx context.Context) {
 				nonces := gpu_mine(p.MiningState.oprhash)
 				mining = false
 				p.MiningState.stats.TotalHashes += int64(len(nonces))
+				p.MiningState.rankings = opr.NewNonceRanking(25)
 				for _, n := range nonces {
 					if n.difficulty > p.MiningState.minimumDifficulty && p.MiningState.rankings.AddNonce(n.nonce, n.difficulty) {
 						p.MiningState.stats.NewDifficulty(n.difficulty)
